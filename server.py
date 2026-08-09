@@ -20,6 +20,7 @@ class Silas:
         self.model, self.tokenizer = load_model(model_path)
 
         self.reminders = []
+        self.reminders_lock = threading.Lock()
 
         if os.path.exists("reminders.json"):
             with open("reminders.json", "r", encoding="utf-8") as f:
@@ -75,32 +76,27 @@ class Silas:
         return ". ".join(parts)
 
     def save_reminders(self):
-        with open("reminders.json", "w", encoding="utf-8") as f:
-            json.dump(self.reminders, f, indent=4)
-
+        with self.reminders_lock:
+            with open("reminders.json", "w", encoding="utf-8") as f:
+                json.dump(self.reminders, f, indent=4)
 
     def delete_reminders(self):
-        self.reminders = [
-            reminder
-            for reminder in self.reminders
-            if not reminder["completed"]
-        ]
-
+        with self.reminders_lock:
+            self.reminders = [r for r in self.reminders if not r["completed"]]
         self.save_reminders()
-
 
     def get_due_reminders(self):
         now = datetime.now()
-
         due = []
 
-        for reminder in self.reminders:
+        with self.reminders_lock:
+            reminders_snapshot = list(self.reminders)
+
+        for reminder in reminders_snapshot:
             if reminder["completed"]:
                 continue
 
-            reminder_time = datetime.fromisoformat(
-                reminder["time"]
-            )
+            reminder_time = datetime.fromisoformat(reminder["time"])
 
             if now >= reminder_time:
                 due.append(reminder)
@@ -109,7 +105,6 @@ class Silas:
 
     def parse_reminder(self, text):
         text = text.lower().strip()
-
         text = " ".join(text.split())
 
         pattern = (
@@ -152,13 +147,7 @@ class Silas:
         else:
             reminder_date = now.date()
 
-        reminder_time = datetime(
-            reminder_date.year,
-            reminder_date.month,
-            reminder_date.day,
-            hour,
-            minute
-        )
+        reminder_time = datetime(reminder_date.year, reminder_date.month, reminder_date.day, hour, minute)
 
         if not reminder_text:
             return None
@@ -170,7 +159,8 @@ class Silas:
         }
 
     def add_reminder(self, reminder):
-        self.reminders.append(reminder)
+        with self.reminders_lock:
+            self.reminders.append(reminder)
         self.save_reminders()
 
     def handle_reminder(self, text):
@@ -183,23 +173,37 @@ class Silas:
                 "set a reminder for tomorrow at 4pm to call John."
             )
 
-        reminder_time = datetime.fromisoformat(
-            reminder["time"]
-        )
+        reminder_time = datetime.fromisoformat(reminder["time"])
 
         if reminder_time <= datetime.now():
             return "That reminder time has already passed."
 
         self.add_reminder(reminder)
 
-        spoken_time = reminder_time.strftime(
-            "%A at %I:%M %p"
-        )
+        spoken_time = reminder_time.strftime("%A at %I:%M %p")
 
         return (
             f"Okay, I'll remind you {spoken_time} "
             f"to {reminder['message']}."
         )
+
+
+def route_message(silas, message):
+    """Decide which handler should answer this message. Returns a string reply."""
+    low = message.lower()
+
+    if "how are you feeling" in low or "how you feeling" in low or "server status" in low:
+        return silas.server_status()
+
+    if "get due reminder" in low:
+        due = silas.get_due_reminders()
+        return f"Reminder: {due[0]['message']}" if due else ""
+
+    if "remind me" in low or "set reminder" in low:
+        return silas.handle_reminder(message)
+
+    return silas.ask_model(message)
+
 
 if __name__ == "__main__":
     silas = Silas()
@@ -210,6 +214,7 @@ if __name__ == "__main__":
     s.listen()
 
     def connection(conn, addr):
+        print(f"Connection from: {addr}")
         try:
             while True:
                 data = conn.recv(1024)
@@ -222,25 +227,25 @@ if __name__ == "__main__":
                 if not message:
                     continue
 
-                if "server status" in message.lower() or "how are you feeling" in message.lower() or 'how you feeling' in message.lower():
-                    response = silas.server_status()
-                if "get due reminder" in message.lower():
-                    reminder = silas.get_due_reminders()
+                print(f"[{addr}] Received: {message!r}")
 
-                    if reminder:
-                        response = f"Reminder: {reminder[0]['message']}"
-                    else:
-                        response = ""
-                elif "remind me" in message.lower() or "set reminder" in message.lower():
-                    response = silas.handle_reminder(message)
-                else:
-                    response = silas.ask_model(message)
+                try:
+                    response = route_message(silas, message)
+                except Exception as e:
+                    print(f"[{addr}] Handler error: {e}")
+                    response = "Sorry, something went wrong processing that."
+
+                print(f"[{addr}] Replying: {response!r}")
                 conn.sendall(response.encode())
+
         except Exception as e:
             print(f"Error from {addr}: {e}")
+        finally:
+            conn.close()
+            print(f"Connection closed: {addr}")
+
+    print("Silas server listening on port 1337...")
 
     while True:
         conn, addr = s.accept()
-        print(f"Connection from: {addr}")
-
         threading.Thread(target=connection, args=(conn, addr), daemon=True).start()
