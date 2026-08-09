@@ -2,6 +2,122 @@
 <html>
 <head>
     <title>Silas</title>
+
+    <style>
+        :root {
+            --bg: #0a0c11;
+            --bg-soft: #12151d;
+            --violet: #6c5ce7;
+            --teal: #14d6c4;
+            --ember: #ff8a5b;
+            --ink: #e9ebf3;
+            --ink-dim: #7a7f92;
+        }
+ 
+        * {
+            box-sizing: border-box;
+        }
+ 
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+ 
+        body {
+            background: radial-gradient(circle at 50% 30%, var(--bg-soft), var(--bg) 70%);
+            color: var(--ink);
+            font-family: -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+ 
+        .stage {
+            position: relative;
+            width: min(70vw, 320px);
+            height: min(70vw, 320px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+ 
+        .ring {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: transform 0.4s ease, opacity 0.4s ease, border-color 0.4s ease;
+        }
+ 
+        .ring--outer {
+            animation: breathe 4.5s ease-in-out infinite;
+        }
+ 
+        .ring--mid {
+            inset: 12%;
+            animation: breathe 4.5s ease-in-out infinite 0.3s;
+        }
+ 
+        #orb {
+            position: relative;
+            width: 46%;
+            height: 46%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, var(--teal), var(--violet) 55%, #241b4d 100%);
+            box-shadow:
+                0 0 30px 6px rgba(108, 92, 231, 0.35),
+                0 0 80px 20px rgba(20, 214, 196, 0.12);
+            transform: scale(1);
+            transition: transform 0.08s ease-out, box-shadow 0.15s ease-out, background 0.6s ease;
+            will-change: transform, box-shadow;
+        }
+ 
+        #orb.command {
+            background: radial-gradient(circle at 35% 30%, var(--ember), var(--violet) 55%, #241b4d 100%);
+        }
+ 
+        #orb.thinking {
+            animation: spin-pulse 1.1s ease-in-out infinite;
+        }
+ 
+        @keyframes breathe {
+            0%, 100% { transform: scale(1); opacity: 0.6; }
+            50% { transform: scale(1.06); opacity: 1; }
+        }
+ 
+        @keyframes spin-pulse {
+            0%, 100% { transform: scale(0.94); }
+            50% { transform: scale(1.02); }
+        }
+ 
+        .caption {
+            margin-top: 42px;
+            text-align: center;
+            max-width: 480px;
+            padding: 0 24px;
+        }
+ 
+        #status {
+            font-size: 14px;
+            letter-spacing: 0.02em;
+            color: var(--ink-dim);
+            margin: 0 0 8px 0;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+ 
+        #text {
+            font-size: 19px;
+            line-height: 1.4;
+            margin: 0;
+            min-height: 27px;
+            color: var(--ink);
+            font-weight: 400;
+        }
+    </style>
 </head>
 
 <body>
@@ -172,29 +288,19 @@
 
         busy = true;
 
-        status.textContent =
-            "Processing...";
+        status.textContent = "Processing...";
 
         const form = new FormData();
-
-        form.append(
-            "audio",
-            blob,
-            "audio.webm"
-        );
+        form.append("audio", blob, "audio.webm");
 
         try {
 
-            const response = await fetch(
-                "/transcribe",
-                {
-                    method: "POST",
-                    body: form
-                }
-            );
+            const response = await fetch("/transcribe", {
+                method: "POST",
+                body: form
+            });
 
-            const data =
-                await response.json();
+            const data = await response.json();
 
             if (data.error) {
                 status.textContent = data.error;
@@ -203,51 +309,34 @@
 
             console.log("Recognised:", data.text);
 
-            if (mode === "wake") {
+            if (data.response) {
+                // Wake word + command arrived in the same utterance — already answered.
+                text.textContent = data.text;
+                speak(data.response);
+                mode = "wake";
+                status.textContent = 'Listening for "silas"...';
+
+            } else if (mode === "wake") {
 
                 if (data.wake_word) {
-
                     mode = "command";
-
                     text.textContent = "Silas";
-
-                    status.textContent =
-                        "Silas detected — waiting for instruction.";
-
+                    status.textContent = "Silas detected — waiting for instruction.";
                 } else {
-
-                    status.textContent =
-                        'Listening for "silas"...';
+                    status.textContent = 'Listening for "silas"...';
                 }
 
-            }
-
-
-            else {
-
+            } else {
                 text.textContent = data.text;
-
-                console.log(
-                    "COMMAND:",
-                    data.text
-                );
-
-                if (data.response) {
-                    speak(data.response);
-                }
-
+                console.log("COMMAND:", data.text);
                 mode = "wake";
-
-                status.textContent =
-                    'Listening for "silas"...';
+                status.textContent = 'Listening for "silas"...';
             }
 
         } catch (error) {
 
             console.error(error);
-
-            status.textContent =
-                "Connection error";
+            status.textContent = "Connection error";
 
         } finally {
 
