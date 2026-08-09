@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Silas</title>
+</head>
+
+<body>
+
+    <p id="status">Starting microphone...</p>
+    <p id="text"></p>
+
+<script>
+    const status = document.getElementById("status");
+    const text = document.getElementById("text");
+
+    let stream;
+    let recorder;
+    let chunks = [];
+
+    let mode = "wake";
+    let busy = false;
+
+    const SILENCE = 0.02;
+    const SILENCE_TIME = 900;
+    const MAX_TIME = 6000;
+
+
+    async function start() {
+
+        stream = await navigator.mediaDevices.getUserMedia({
+            audio: true
+        });
+
+        status.textContent = 'Listening for "silas"...';
+
+        listen();
+    }
+
+    function speak(text) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-GB";
+        speechSynthesis.speak(utterance);
+    }
+
+
+    function listen() {
+
+        if (busy) return;
+
+        chunks = [];
+
+        const audioContext =
+            new AudioContext();
+
+        const source =
+            audioContext.createMediaStreamSource(stream);
+
+        const analyser =
+            audioContext.createAnalyser();
+
+        analyser.fftSize = 512;
+
+        source.connect(analyser);
+
+        const data =
+            new Uint8Array(analyser.fftSize);
+
+        recorder =
+            new MediaRecorder(stream);
+
+        recorder.ondataavailable = e => {
+            if (e.data.size > 0) {
+                chunks.push(e.data);
+            }
+        };
+
+        let speaking = false;
+        let speechStart = 0;
+        let silenceStart = null;
+
+        recorder.onstop = async () => {
+
+            audioContext.close();
+
+            if (speaking) {
+
+                const blob = new Blob(
+                    chunks,
+                    { type: "audio/webm" }
+                );
+
+                await send(blob);
+            }
+
+            if (!busy) {
+                listen();
+            }
+        };
+
+        recorder.start();
+
+        function check() {
+
+            if (recorder.state !== "recording") {
+                return;
+            }
+
+            analyser.getByteTimeDomainData(data);
+
+            let sum = 0;
+
+            for (let i = 0; i < data.length; i++) {
+
+                const value =
+                    (data[i] - 128) / 128;
+
+                sum += value * value;
+            }
+
+            const rms =
+                Math.sqrt(sum / data.length);
+
+            const now = Date.now();
+
+            if (rms > SILENCE) {
+
+                silenceStart = null;
+
+                if (!speaking) {
+
+                    speaking = true;
+                    speechStart = now;
+
+                    status.textContent =
+                        mode === "wake"
+                        ? 'Listening for "silas"...'
+                        : "Listening for instruction...";
+                }
+
+            } else if (speaking) {
+
+                if (silenceStart === null) {
+                    silenceStart = now;
+                }
+
+                if (
+                    now - silenceStart >= SILENCE_TIME
+                ) {
+
+                    recorder.stop();
+                    return;
+                }
+            }
+
+            if (
+                speaking &&
+                now - speechStart >= MAX_TIME
+            ) {
+
+                recorder.stop();
+                return;
+            }
+
+            requestAnimationFrame(check);
+        }
+
+        check();
+    }
+
+
+    async function send(blob) {
+
+        busy = true;
+
+        status.textContent =
+            "Processing...";
+
+        const form = new FormData();
+
+        form.append(
+            "audio",
+            blob,
+            "audio.webm"
+        );
+
+        try {
+
+            const response = await fetch(
+                "/transcribe",
+                {
+                    method: "POST",
+                    body: form
+                }
+            );
+
+            const data =
+                await response.json();
+
+            if (data.error) {
+                status.textContent = data.error;
+                return;
+            }
+
+            console.log("Recognised:", data.text);
+
+            if (mode === "wake") {
+
+                if (data.wake_word) {
+
+                    mode = "command";
+
+                    text.textContent = "Silas";
+
+                    status.textContent =
+                        "Silas detected — waiting for instruction.";
+
+                } else {
+
+                    status.textContent =
+                        'Listening for "silas"...';
+                }
+
+            }
+
+
+            else {
+
+                text.textContent = data.text;
+
+                console.log(
+                    "COMMAND:",
+                    data.text
+                );
+
+                if (data.response) {
+                    speak(data.response);
+                }
+
+                mode = "wake";
+
+                status.textContent =
+                    'Listening for "silas"...';
+            }
+
+        } catch (error) {
+
+            console.error(error);
+
+            status.textContent =
+                "Connection error";
+
+        } finally {
+
+            busy = false;
+        }
+    }
+
+    window.addEventListener(
+        "load",
+        async () => {
+
+            try {
+
+                await start();
+
+            } catch (error) {
+
+                console.error(error);
+
+                status.textContent =
+                    "Microphone permission required.";
+            }
+        }
+    );
+
+</script>
+
+</body>
+</html>
