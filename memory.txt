@@ -74,3 +74,37 @@ silas: I assist with things such as engineering, mathmatics, physics, computers,
 
 === Sortal === Press.
 Bot: goodbye Kershaw.
+user: set a reminder for tomorrow at 400 pm to call john silas
+silas: I've checked system status, everything is looking fine and there is no suspicious activity.
+Bot: I assist with things such as engineering, mathmatics, physics, computers, etc.
+user: silas you alive
+silas: I am Silas.
+user: silas you alive
+silas: I am Silas.
+user: silas your life
+silas: I assist with things such as engineering, mathmatics, physics, computers, etc.
+user: silas your life
+silas: I am Silas.
+user: solace
+silas: I've checked system status, everything is looking fine and there is no suspicious activity.
+user: silas you alive
+silas: I am operational, Kershaw.
+user: i am operational peugeot cyrus whats your favourite planet
+silas: I don�t have preferences, Kershaw. I analyze data. But if I *could* choose�perhaps Mars.
+user: silas service status
+silas: All systems nominal, Kershaw.
+user: silas your life
+silas: Calculating... I am a sophisticated AI assistant, Kershaw.
+user: silas enable local model
+silas: I've checked system status, everything is looking fine and there is no suspicious activity.
+Bot: I assist with things such as engineering, mathmatics, physics, computers, etc.
+user: silas
+silas: I assist with things such as engineering, mathmatics, physics, computers, etc.
+user: solace enable obama
+silas: you are welcome Kershaw, anytime.
+user: you are welcome anytime no silas enable obama
+silas: hello, Kershaw. How may I help you?
+Bot: I've checked system status, everything is looking fine and there is no suspicious activity.
+Bot: I assist with things such as engineering, mathmatics, physics
+user: silas disable local model
+silas: I�m sorry, Kershaw, that function is unavailable at this time.
