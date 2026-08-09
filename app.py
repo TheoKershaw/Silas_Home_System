@@ -9,50 +9,56 @@ import socket
 import threading
 
 app = Flask(__name__)
-
 recognizer = sr.Recognizer()
-
 addr, port = "127.0.0.1", 1337
+socket_lock = threading.Lock()
 
-def execute(text):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((addr, port))
-        s.sendall(text.encode())
-
-        data = s.recv(4096).decode()
-
-    print(data)
-    return data
+def execute(text, timeout=15):
+    if "hello" in text:
+        return "Sir"
+    else:
+        try:
+            with socket_lock:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(timeout)
+                    s.connect((addr, port))
+                    s.sendall(text.encode())
+                    data = s.recv(4096).decode()
+            print("Bot replied:", data)
+            return data
+        except socket.timeout:
+            print("execute() timed out waiting for bot.py")
+            return "Sorry, Silas timed out."
+        except (ConnectionRefusedError, OSError) as e:
+            print("execute() connection error:", e)
+            return "Sorry, I couldn't reach Silas right now."
 
 def reminder_checker():
     while True:
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.connect((addr, port))
-                s.sendall(b"get due reminder")
+            with socket_lock:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(5)
+                    s.connect((addr, port))
+                    s.sendall(b"get due reminder")
+                    data = s.recv(4096).decode()
 
-                data = s.recv(4096).decode()
-
-                if data and data != "NO_REMINDER":
-                    print("Reminder:", data)
-
-                    # This is where we will make your existing
-                    # speech system speak the reminder.
+            if data:
+                print("Reminder:", data)
 
         except Exception as e:
             print("Reminder checker error:", e)
 
         time.sleep(2)
 
-threading.Thread(
-    target=reminder_checker,
-    daemon=True
-).start()
+if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
+    threading.Thread(target=reminder_checker, daemon=True).start()
 
 def clean_text(text):
     text = text.lower()
     text = re.sub(r"[^\w\s]", "", text)
     return " ".join(text.split())
+
 
 def recognize_audio(webm_path):
     wav_path = webm_path + ".wav"
@@ -82,6 +88,9 @@ def recognize_audio(webm_path):
             )
         except sr.UnknownValueError:
             return ""
+        except sr.RequestError as e:
+            print("Google recognizer request error:", e)
+            return ""
 
         return clean_text(text)
 
@@ -93,6 +102,7 @@ def recognize_audio(webm_path):
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
@@ -126,24 +136,26 @@ def transcribe():
             or "sinus" in text
         )
 
-        repsonse = execute(text)
-
-        return jsonify({
-            "text": text,
-            "wake_word": wake_word,
-            "response": repsonse
-        })
+        if wake_word:
+            response = execute(text)
+            return jsonify({
+                "text": text,
+                "wake_word": wake_word,
+                "response": response
+            })
+        else:
+            return jsonify({
+                "text": text,
+                "wake_word": wake_word
+            })
 
     except Exception as e:
-
         print("Error:", e)
-
         return jsonify({
             "error": str(e)
         }), 500
 
     finally:
-
         if webm_path and os.path.exists(webm_path):
             os.remove(webm_path)
 
