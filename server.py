@@ -8,6 +8,7 @@ import time
 import json
 import re
 from datetime import datetime, timedelta
+import ollama
 
 class Silas:
     def __init__(self):
@@ -26,6 +27,10 @@ class Silas:
             with open("reminders.json", "r", encoding="utf-8") as f:
                 self.reminders = json.load(f)
 
+        self.chat_history = [
+            {"role": "system", "content": "You are Silas, a helpful voice assistant. Keep replies short and conversational, suitable for being spoken aloud. And you will only refer the user as Master Kershaw."}
+        ] + self.load_memory()
+
     def load_memory(self):
         history = []
         if os.path.exists("memory.txt"):
@@ -43,6 +48,7 @@ class Silas:
             f.write(text + "\n")
 
     def ask_model(self, prompt, max_new_tokens=200, temperature=0.8, top_k=40):
+        print(">>> ASK_MODEL CALLED <<<")
         self.mem(f"user: {prompt}")
         formatted_prompt = f"User: {prompt}\nBot:"
 
@@ -60,6 +66,19 @@ class Silas:
             reply = "Sorry, I don't have a good response for that yet."
 
         self.mem(f"silas: {reply}")
+        return reply
+
+    def ask_ollama(self, prompt):
+        print(">>> ASK_OLLAMA CALLED <<<")
+        self.chat_history.append({"role": "user", "content": prompt})
+        self.mem(f"user: {prompt}")
+
+        response = ollama.chat(model="gemma3:4b", messages=self.chat_history)
+        reply = response["message"]["content"]
+
+        self.chat_history.append({"role": "assistant", "content": reply})
+        self.mem(f"silas: {reply}")
+
         return reply
 
     def server_status(self):
@@ -187,26 +206,40 @@ class Silas:
             f"to {reminder['message']}."
         )
 
-
-def route_message(silas, message):
-    """Decide which handler should answer this message. Returns a string reply."""
-    low = message.lower()
-
-    if "how are you feeling" in low or "how you feeling" in low or "server status" in low:
-        return silas.server_status()
-
-    if "get due reminder" in low:
-        due = silas.get_due_reminders()
-        return f"Reminder: {due[0]['message']}" if due else ""
-
-    if "remind me" in low or "set reminder" in low:
-        return silas.handle_reminder(message)
-
-    return silas.ask_model(message)
-
-
 if __name__ == "__main__":
     silas = Silas()
+    model = "ollama"
+
+    def route_message(silas, message):
+        global model
+        low = message.lower()
+
+        if "how are you feeling" in low or "how you feeling" in low or "server status" in low:
+            return silas.server_status()
+
+        elif "get due reminder" in low:
+            due = silas.get_due_reminders()
+            return f"Reminder: {due[0]['message']}" if due else ""
+
+        elif "remind me" in low or "set reminder" in low:
+            return silas.handle_reminder(message)
+
+        elif "enable local model" in low or "disable ollama" in low or "enable my model" in low:
+            model = "local"
+
+        elif "enable ollama" in low or "disable local model" in low or "disable my model" in low:
+            model = "ollama"
+
+        elif 'memory wipe' in low or 'wipe memory' in low or 'wipe your memory' in low or 'forget' in low:
+            os.remove("./memory.txt")
+            silas.mem("\n")
+
+        elif 'time' in low:
+            return f"The time is {datetime.now().hour} {datetime.now().minute} on the {datetime.now().date()} Master Kershaw."
+
+        else: 
+            if model == "local": return silas.ask_model(message)
+            else: return silas.ask_ollama(message)
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
