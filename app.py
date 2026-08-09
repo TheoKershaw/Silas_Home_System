@@ -32,13 +32,16 @@ def execute(text, timeout=15):
         except (ConnectionRefusedError, OSError) as e:
             print("execute() connection error:", e)
             return "Sorry, I couldn't reach Silas right now."
+        except Exception as e:
+            print(e)
+            return "Error with silas"
 
 def reminder_checker():
     while True:
         try:
             with socket_lock:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.settimeout(5)
+                    #s.settimeout(5)
                     s.connect((addr, port))
                     s.sendall(b"get due reminder")
                     data = s.recv(4096).decode()
