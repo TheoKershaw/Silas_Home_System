@@ -4,6 +4,10 @@ import os
 import socket
 import threading
 import psutil
+import time
+import json
+import re
+from datetime import datetime, timedelta
 
 class Silas:
     def __init__(self):
@@ -14,6 +18,12 @@ class Silas:
                 "in this same directory (it will train on data.txt and save model.pt)."
             )
         self.model, self.tokenizer = load_model(model_path)
+
+        self.reminders = []
+
+        if os.path.exists("reminders.json"):
+            with open("reminders.json", "r", encoding="utf-8") as f:
+                self.reminders = json.load(f)
 
     def load_memory(self):
         history = []
@@ -64,6 +74,133 @@ class Silas:
 
         return ". ".join(parts)
 
+    def save_reminders(self):
+        with open("reminders.json", "w", encoding="utf-8") as f:
+            json.dump(self.reminders, f, indent=4)
+
+
+    def delete_reminders(self):
+        self.reminders = [
+            reminder
+            for reminder in self.reminders
+            if not reminder["completed"]
+        ]
+
+        self.save_reminders()
+
+
+    def get_due_reminders(self):
+        now = datetime.now()
+
+        due = []
+
+        for reminder in self.reminders:
+            if reminder["completed"]:
+                continue
+
+            reminder_time = datetime.fromisoformat(
+                reminder["time"]
+            )
+
+            if now >= reminder_time:
+                due.append(reminder)
+
+        return due
+
+    def parse_reminder(self, text):
+        text = text.lower().strip()
+
+        text = " ".join(text.split())
+
+        pattern = (
+            r"(?:set\s+(?:a\s+)?reminder|"
+            r"remind\s+me)"
+            r"\s+(?:for\s+)?"
+            r"(today|tomorrow)"
+            r"\s+at\s+"
+            r"(\d{1,2})"
+            r"(?:\s*:\s*(\d{2}))?"
+            r"\s*(am|pm)?"
+            r"(?:\s+(?:that\s+)?(?:i\s+)?(?:have\s+to\s+|need\s+to\s+|should\s+)?to?\s*)?"
+            r"(.+)$"
+        )
+
+        match = re.search(pattern, text)
+
+        if not match:
+            return None
+
+        day = match.group(1)
+        hour = int(match.group(2))
+        minute = int(match.group(3) or 0)
+        am_pm = match.group(4)
+        reminder_text = match.group(5).strip()
+
+        if am_pm:
+            if am_pm == "pm" and hour != 12:
+                hour += 12
+            elif am_pm == "am" and hour == 12:
+                hour = 0
+
+        if hour > 23 or minute > 59:
+            return None
+
+        now = datetime.now()
+
+        if day == "tomorrow":
+            reminder_date = now.date() + timedelta(days=1)
+        else:
+            reminder_date = now.date()
+
+        reminder_time = datetime(
+            reminder_date.year,
+            reminder_date.month,
+            reminder_date.day,
+            hour,
+            minute
+        )
+
+        if not reminder_text:
+            return None
+
+        return {
+            "time": reminder_time.isoformat(),
+            "message": reminder_text,
+            "completed": False
+        }
+
+    def add_reminder(self, reminder):
+        self.reminders.append(reminder)
+        self.save_reminders()
+
+    def handle_reminder(self, text):
+        reminder = self.parse_reminder(text)
+
+        if reminder is None:
+            return (
+                "I couldn't understand the reminder. "
+                "Try saying something like "
+                "set a reminder for tomorrow at 4pm to call John."
+            )
+
+        reminder_time = datetime.fromisoformat(
+            reminder["time"]
+        )
+
+        if reminder_time <= datetime.now():
+            return "That reminder time has already passed."
+
+        self.add_reminder(reminder)
+
+        spoken_time = reminder_time.strftime(
+            "%A at %I:%M %p"
+        )
+
+        return (
+            f"Okay, I'll remind you {spoken_time} "
+            f"to {reminder['message']}."
+        )
+
 if __name__ == "__main__":
     silas = Silas()
 
@@ -85,8 +222,17 @@ if __name__ == "__main__":
                 if not message:
                     continue
 
-                if "server status" in message or "how are you feeling" in message or 'how you feeling' in message:
+                if "server status" in message.lower() or "how are you feeling" in message.lower() or 'how you feeling' in message.lower():
                     response = silas.server_status()
+                if "get due reminder" in message.lower():
+                    reminder = silas.get_due_reminders()
+
+                    if reminder:
+                        response = f"Reminder: {reminder[0]['message']}"
+                    else:
+                        response = ""
+                elif "remind me" in message.lower() or "set reminder" in message.lower():
+                    response = silas.handle_reminder(message)
                 else:
                     response = silas.ask_model(message)
                 conn.sendall(response.encode())
