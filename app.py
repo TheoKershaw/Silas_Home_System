@@ -2,10 +2,11 @@ import os
 import re
 import subprocess
 import tempfile
-
+import time
 from flask import Flask, render_template, request, jsonify
 import speech_recognition as sr
 import socket
+import threading
 
 app = Flask(__name__)
 
@@ -22,6 +23,31 @@ def execute(text):
 
     print(data)
     return data
+
+def reminder_checker():
+    while True:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((addr, port))
+                s.sendall(b"get due reminder")
+
+                data = s.recv(4096).decode()
+
+                if data and data != "NO_REMINDER":
+                    print("Reminder:", data)
+
+                    # This is where we will make your existing
+                    # speech system speak the reminder.
+
+        except Exception as e:
+            print("Reminder checker error:", e)
+
+        time.sleep(2)
+
+threading.Thread(
+    target=reminder_checker,
+    daemon=True
+).start()
 
 def clean_text(text):
     text = text.lower()
