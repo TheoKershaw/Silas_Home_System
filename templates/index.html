@@ -122,6 +122,7 @@
 
 <body>
     <p id="status">Starting microphone...</p>
+    <p id="text"></p>
 <script>
     const status = document.getElementById("status");
     const text = document.getElementById("text");
@@ -157,29 +158,16 @@
 
 
     function listen() {
-
         if (busy) return;
 
         chunks = [];
-
-        const audioContext =
-            new AudioContext();
-
-        const source =
-            audioContext.createMediaStreamSource(stream);
-
-        const analyser =
-            audioContext.createAnalyser();
-
+        const audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
         analyser.fftSize = 512;
-
         source.connect(analyser);
-
-        const data =
-            new Uint8Array(analyser.fftSize);
-
-        recorder =
-            new MediaRecorder(stream);
+        const data = new Uint8Array(analyser.fftSize);
+        recorder = new MediaRecorder(stream);
 
         recorder.ondataavailable = e => {
             if (e.data.size > 0) {
@@ -192,11 +180,9 @@
         let silenceStart = null;
 
         recorder.onstop = async () => {
-
             audioContext.close();
 
             if (speaking) {
-
                 const blob = new Blob(
                     chunks,
                     { type: "audio/webm" }
@@ -213,30 +199,24 @@
         recorder.start();
 
         function check() {
-
             if (recorder.state !== "recording") {
                 return;
             }
 
             analyser.getByteTimeDomainData(data);
-
             let sum = 0;
 
             for (let i = 0; i < data.length; i++) {
-
-                const value =
-                    (data[i] - 128) / 128;
+                const value = (data[i] - 128) / 128;
 
                 sum += value * value;
             }
 
-            const rms =
-                Math.sqrt(sum / data.length);
+            const rms = Math.sqrt(sum / data.length);
 
             const now = Date.now();
 
             if (rms > SILENCE) {
-
                 silenceStart = null;
 
                 if (!speaking) {
@@ -280,18 +260,13 @@
         check();
     }
 
-
     async function send(blob) {
-
         busy = true;
-
         status.textContent = "Processing...";
-
         const form = new FormData();
         form.append("audio", blob, "audio.webm");
 
         try {
-
             const response = await fetch("/transcribe", {
                 method: "POST",
                 body: form
@@ -307,14 +282,12 @@
             console.log("Recognised:", data.text);
 
             if (data.response) {
-                // Wake word + command arrived in the same utterance — already answered.
-                text.textContent = data.text;
+                text.textContent = data.response;
                 speak(data.response);
                 mode = "wake";
                 status.textContent = 'Listening for "silas"...';
 
             } else if (mode === "wake") {
-
                 if (data.wake_word) {
                     mode = "command";
                     text.textContent = "Silas";
@@ -331,12 +304,9 @@
             }
 
         } catch (error) {
-
             console.error(error);
             status.textContent = "Connection error";
-
         } finally {
-
             busy = false;
         }
     }
