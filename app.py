@@ -29,6 +29,12 @@ def execute(text, timeout=15):
     
     elif "play my playlist" in text or "play coding music" in text or "play coding playlist" in text:
         return "playlist"
+
+    elif "add task" in text or "add toss" in text:
+        return f"add task {text}"
+
+    elif "clear tasks" in text or "remove tasks" in text:
+        return "clear tasks"
     
     else:
         try:
@@ -68,8 +74,9 @@ def reminder_checker():
 
         time.sleep(2)
 
-if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
-    threading.Thread(target=reminder_checker, daemon=True).start()
+
+#if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
+#    threading.Thread(target=reminder_checker, daemon=True).start()
 
 def clean_text(text):
     text = text.lower()
@@ -173,7 +180,6 @@ def transcribe():
     finally:
         if webm_path and os.path.exists(webm_path):
             os.remove(webm_path)
-
 
 if __name__ == "__main__":
     app.run(
