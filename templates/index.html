@@ -117,12 +117,124 @@
             color: var(--ink);
             font-weight: 400;
         }
+
+        .mini-window {
+            position: fixed;
+            width: 500px;
+            height: 350px;
+
+            right: 30px;
+            bottom: 30px;
+
+            background: #111;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 14px;
+
+            box-shadow:
+                0 20px 60px rgba(0,0,0,0.6),
+                0 0 30px rgba(108,92,231,0.15);
+
+            overflow: hidden;
+
+            display: none;
+
+            z-index: 1000;
+        }
+
+        .mini-window-header {
+            height: 40px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            padding: 0 12px;
+
+            background: #171a23;
+            color: white;
+
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .mini-window-header button {
+            background: none;
+            border: none;
+
+            color: #aaa;
+            font-size: 24px;
+
+            cursor: pointer;
+        }
+
+        .mini-window-header button:hover {
+            color: white;
+        }
+
+        .mini-window iframe {
+            width: 100%;
+            height: calc(100% - 40px);
+
+            border: none;
+        }
     </style>
 </head>
 
 <body>
     <p id="status">Starting microphone...</p>
     <p id="text"></p>
+
+    <div id="youtubeWindow" class="mini-window">
+        <div class="mini-window-header">
+            <span>YouTube</span>
+            <button onclick="closeYouTube()">×</button>
+        </div>
+
+        <iframe
+            src="http://localhost:5001/proxy?url=https://www.youtube.com"
+            allow="autoplay; encrypted-media; fullscreen"
+            allowfullscreen>
+        </iframe>
+    </div>
+
+    <div id="newsWindow" class="mini-window">
+        <div class="mini-window-header">
+            <span>News</span>
+            <button onclick="closeNews()">×</button>
+        </div>
+
+        <iframe
+            src="http://localhost:5001/proxy?url=https://www.gbnews.com/"
+            allow="autoplay; encrypted-media; fullscreen"
+            allowfullscreen>
+        </iframe>
+    </div>
+
+    <div id="mapWindow" class="mini-window">
+        <div class="mini-window-header">
+            <span>Map</span>
+            <button onclick="closeMap()">×</button>
+        </div>
+
+        <iframe
+            src="http://localhost:5001/proxy?url=https://maps.google.com/"
+            allow="autoplay; encrypted-media; fullscreen"
+            allowfullscreen>
+        </iframe>
+    </div>
+
+    <div id="playWindow" class="mini-window">
+        <div class="mini-window-header">
+            <span>Youtube Playlist</span>
+            <button onclick="closePlay()">×</button>
+        </div>
+
+        <iframe
+            src="http://localhost:5001/proxy?url=https://www.youtube.com/watch?v=fgT9zGkiLig&list=PLAr2wvz5WBv0"
+            allow="autoplay; encrypted-media; fullscreen"
+            allowfullscreen>
+        </iframe>
+    </div>
 <script>
     const status = document.getElementById("status");
     const text = document.getElementById("text");
@@ -156,6 +268,29 @@
         speechSynthesis.speak(utterance);
     }
 
+    function openYouTube() {
+        document.getElementById("youtubeWindow").style.display = "block";
+    } function closeYouTube() {
+        document.getElementById("youtubeWindow").style.display = "none";
+    }
+
+    function openNews() {
+        document.getElementById("newsWindow").style.display = "block";
+    } function closeNews() {
+        document.getElementById("newsWindow").style.display = "none";
+    }
+
+    function openMap() {
+        document.getElementById("mapWindow").style.display = "block";
+    } function closeMap() {
+        document.getElementById("mapWindow").style.display = "none";
+    }
+
+    function openPlay() {
+        document.getElementById("playWindow").style.display = "block";
+    } function closePlay() {
+        document.getElementById("playWindow").style.display = "none";
+    }
 
     function listen() {
         if (busy) return;
@@ -282,10 +417,28 @@
             console.log("Recognised:", data.text);
 
             if (data.response) {
-                text.textContent = data.response;
-                speak(data.response);
-                mode = "wake";
-                status.textContent = 'Listening for "silas"...';
+                if (data.response == "open youtube") {
+                    openYouTube();
+                    speak("Opening youtube");
+                    text.textContent = "Opening youtube";
+                } else if (data.response == "open news") {
+                    openNews();
+                    speak("Opening news");
+                    text.textContent = "Opening news";
+                } else if (data.response == "open map") {
+                    openMap();
+                    speak("Opening map");
+                    text.textContent = "Opening map";
+                } else if (data.response == "playlist") {
+                    openPlay();
+                    speak("Opening playlist");
+                    text.textContent = "Opening playlist";
+                } else {
+                    text.textContent = data.response;
+                    speak(data.response);
+                    mode = "wake";
+                    status.textContent = 'Listening for "silas"...';
+                }
 
             } else if (mode === "wake") {
                 if (data.wake_word) {
