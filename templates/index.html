@@ -177,10 +177,40 @@
 
             border: none;
         }
+
+        .circle {
+            display: block;
+            background: black;
+            border-radius: 50%;
+            height: 300px;
+            width: 300px;
+            margin: 0;
+            background: radial-gradient(circle at 100px 100px, #5cabff, #000);
+        }
+
+        .tasks {
+            white-space: pre-line;
+            position: absolute;
+            top: 8px;
+            left: 16px;
+            font-size: 20px;
+            font-size: 14px;
+            letter-spacing: 0.02em;
+            color: var(--ink-dim);
+            margin: 0 0 8px 0;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
     </style>
 </head>
 
 <body>
+    <p class="tasks" id="tasks"></p>
+
+    <figure class="circle"></figure>
+    <br>
+    <br>
+
     <p id="status">Starting microphone...</p>
     <p id="text"></p>
 
@@ -191,7 +221,7 @@
         </div>
 
         <iframe
-            src="http://localhost:5001/proxy?url=https://www.youtube.com"
+            src="http://127.0.0.1:5001/proxy?url=https://www.youtube.com"
             allow="autoplay; encrypted-media; fullscreen"
             allowfullscreen>
         </iframe>
@@ -204,7 +234,7 @@
         </div>
 
         <iframe
-            src="http://localhost:5001/proxy?url=https://www.gbnews.com/"
+            src="http://127.0.0.1:5001/proxy?url=https://www.gbnews.com/"
             allow="autoplay; encrypted-media; fullscreen"
             allowfullscreen>
         </iframe>
@@ -217,7 +247,7 @@
         </div>
 
         <iframe
-            src="http://localhost:5001/proxy?url=https://maps.google.com/"
+            src="http://127.0.0.1:5001/proxy?url=https://maps.google.com/"
             allow="autoplay; encrypted-media; fullscreen"
             allowfullscreen>
         </iframe>
@@ -230,7 +260,7 @@
         </div>
 
         <iframe
-            src="http://localhost:5001/proxy?url=https://www.youtube.com/watch?v=fgT9zGkiLig&list=PLAr2wvz5WBv0"
+            src="http://127.0.0.1:5001/proxy?url=https://www.youtube.com/watch?v=fgT9zGkiLig&list=PLAr2wvz5WBv0"
             allow="autoplay; encrypted-media; fullscreen"
             allowfullscreen>
         </iframe>
@@ -238,6 +268,9 @@
 <script>
     const status = document.getElementById("status");
     const text = document.getElementById("text");
+    const taskText = document.getElementById("tasks");
+
+    taskText.textContent = "";
 
     let stream;
     let recorder;
@@ -433,6 +466,17 @@
                     openPlay();
                     speak("Opening playlist");
                     text.textContent = "Opening playlist";
+                } else if (data.response.startsWith("add task")) {
+                    const task = data.text.split("add task")[1].trim();
+
+                    taskText.textContent += task+"\n";
+
+                    speak("Doing that now, sir.");
+                    text.textContent = "Doing that now, sir.";
+                } else if (data.response.startsWith("clear tasks")) {
+                    taskText.textContent = "";
+                    speak("Sir");
+                    text.textContent = "Sir";
                 } else {
                     text.textContent = data.response;
                     speak(data.response);
