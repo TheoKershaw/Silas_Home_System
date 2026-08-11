@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, jsonify
 import speech_recognition as sr
 import socket
 import threading
+import webbrowser
 
 app = Flask(__name__)
 recognizer = sr.Recognizer()
@@ -16,6 +17,28 @@ socket_lock = threading.Lock()
 def execute(text, timeout=15):
     if "hello" in text:
         return "Sir"
+    
+    elif "open youtube" in text:
+        return "open youtube"
+    
+    elif "open news" in text or "what's on the news" in text or "what is on the news" in text:
+        return "open news"
+    
+    elif "open map" in text:
+        return "open map"
+    
+    elif "open inbox" in text or "open my inbox" in text or "open email" in text or "open my email" in text:
+        webbrowser.open_new("https://mail.google.com")
+        return "Sir"
+    
+    elif "open prime" in text or "opem prime video" in text:
+        webbrowser.open_new("https://primevideo.com")
+        return "Sir"
+    
+    elif "play my playlist" in text or "play coding music" in text or "play coding playlist" in text:
+        #webbrowser.open_new("https://www.youtube.com/watch?v=fgT9zGkiLig&list=PLAr2wvz5WBv0")
+        return "playlist"
+    
     else:
         try:
             with socket_lock:
@@ -54,14 +77,13 @@ def reminder_checker():
 
         time.sleep(2)
 
-if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
-    threading.Thread(target=reminder_checker, daemon=True).start()
+#if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
+    #threading.Thread(target=reminder_checker, daemon=True).start()
 
 def clean_text(text):
     text = text.lower()
     text = re.sub(r"[^\w\s]", "", text)
     return " ".join(text.split())
-
 
 def recognize_audio(webm_path):
     wav_path = webm_path + ".wav"
@@ -101,11 +123,9 @@ def recognize_audio(webm_path):
         if os.path.exists(wav_path):
             os.remove(wav_path)
 
-
 @app.route("/")
 def index():
     return render_template("index.html")
-
 
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
@@ -137,6 +157,7 @@ def transcribe():
             or "solace" in text
             or "cyrus" in text
             or "sinus" in text
+            or "silence" in text
         )
 
         if wake_word:
